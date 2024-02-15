@@ -4,6 +4,10 @@
 ////////////////////////////////
 //~ rjf: Frontend/UI Pass Tasks
 //
+// [x] hover-eval when window is not focused - maybe just start directly
+//     using mouse-move events here
+// [x] CRT asserts - stepping over int 29 should work just like stepping over
+//     an int3
 // [ ] committing needs to happen when navigating focus away for any reason
 //
 // [ ] source view -> floating margin/line-nums
@@ -44,6 +48,8 @@
 
 ////////////////////////////////
 //~ rjf: Hot, High Priority Tasks (Complete Unusability, Crashes, Fire-Worthy)
+//
+// [ ] Jump table thunks, on code w/o /INCREMENTAL:NO
 //
 // [ ] ** Thread/process control bullet-proofing, including solo-step mode
 //
@@ -275,6 +281,7 @@
 // [ ] Fancy View Rules
 //  [ ] table column boundaries should be checked against *AFTER* table
 //      contents, not before
+//  [ ] `array:(x, y)` - multidimensional array
 //  [ ] `text[:lang]` - interpret memory as text, in lang `lang`
 //  [ ] `disasm:arch` - interpret memory as machine code for isa `arch`
 //  [ ] `memory` - view memory in usual memory hex-editor view
@@ -300,6 +307,7 @@
 //
 // [ ] @feature processor/data breakpoints
 // [ ] @feature automatically snap to search matches when searching source files
+// [ ] automatically start search query with selected text
 // [ ] @feature entity views: filtering & reordering
 
 ////////////////////////////////
@@ -399,10 +407,16 @@
 #define RADDBG_VERSION_PATCH 8
 #define RADDBG_VERSION_STRING_LITERAL Stringify(RADDBG_VERSION_MAJOR) "." Stringify(RADDBG_VERSION_MINOR) "." Stringify(RADDBG_VERSION_PATCH)
 #if defined(NDEBUG)
-# define RADDBG_TITLE_STRING_LITERAL "The RAD Debugger (" RADDBG_VERSION_STRING_LITERAL " ALPHA) - " __DATE__ ""
+# define RADDBG_BUILD_STR ""
 #else
-# define RADDBG_TITLE_STRING_LITERAL "The RAD Debugger (" RADDBG_VERSION_STRING_LITERAL " ALPHA) - " __DATE__ " [Debug]"
+# define RADDBG_BUILD_STR " [Debug]"
 #endif
+#if defined(RADDBG_GIT)
+# define RADDBG_GIT_STR " [" RADDBG_GIT "]"
+#else
+# define RADDBG_GIT_STR ""
+#endif
+#define RADDBG_TITLE_STRING_LITERAL "The RAD Debugger (" RADDBG_VERSION_STRING_LITERAL " ALPHA) - " __DATE__ "" RADDBG_GIT_STR RADDBG_BUILD_STR
 #define RADDBG_GITHUB_ISSUES "https://github.com/EpicGames/raddebugger/issues"
 
 ////////////////////////////////

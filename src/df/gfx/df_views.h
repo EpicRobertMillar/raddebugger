@@ -282,9 +282,18 @@ typedef enum DF_EvalWatchViewFillKind
   DF_EvalWatchViewFillKind_Globals,
   DF_EvalWatchViewFillKind_ThreadLocals,
   DF_EvalWatchViewFillKind_Types,
+  DF_EvalWatchViewFillKind_Procedures,
   DF_EvalWatchViewFillKind_COUNT
 }
 DF_EvalWatchViewFillKind;
+
+typedef struct DF_EvalWatchViewPoint DF_EvalWatchViewPoint;
+struct DF_EvalWatchViewPoint
+{
+  DF_EvalWatchViewColumnKind column_kind;
+  DF_ExpandKey parent_key;
+  DF_ExpandKey key;
+};
 
 typedef struct DF_EvalWatchViewState DF_EvalWatchViewState;
 struct DF_EvalWatchViewState
@@ -294,10 +303,9 @@ struct DF_EvalWatchViewState
   // rjf: fill kind (way that the contents of the watch view are computed)
   DF_EvalWatchViewFillKind fill_kind;
   
-  // rjf; selection state
-  DF_EvalWatchViewColumnKind selected_column;
-  DF_ExpandKey selected_parent_key;
-  DF_ExpandKey selected_key;
+  // rjf; table cursor state
+  DF_EvalWatchViewPoint cursor;
+  DF_EvalWatchViewPoint mark;
   
   // rjf: text input state
   TxtPt input_cursor;
@@ -447,7 +455,7 @@ internal DF_EvalRoot *  df_eval_root_from_expand_key(DF_EvalWatchViewState *ews,
 internal String8        df_string_from_eval_root(DF_EvalRoot *root);
 
 //- rjf: windowed watch tree visualization
-internal DF_EvalVizBlockList df_eval_viz_block_list_from_watch_view_state(Arena *arena, DBGI_Scope *scope, DF_CtrlCtx *ctrl_ctx, EVAL_ParseCtx *parse_ctx, DF_View *view, DF_EvalWatchViewState *ews);
+internal DF_EvalVizBlockList df_eval_viz_block_list_from_watch_view_state(Arena *arena, DBGI_Scope *scope, DF_CtrlCtx *ctrl_ctx, EVAL_ParseCtx *parse_ctx, EVAL_String2ExprMap *macro_map, DF_View *view, DF_EvalWatchViewState *ews);
 
 //- rjf: eval/watch views main hooks
 internal void df_eval_watch_view_init(DF_EvalWatchViewState *ewv, DF_View *view, DF_EvalWatchViewFillKind fill_kind);

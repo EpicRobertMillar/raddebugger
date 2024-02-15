@@ -306,6 +306,7 @@ struct UI_Box
   F32 disabled_t;
   F32 focus_hot_t;
   F32 focus_active_t;
+  F32 focus_active_disabled_t;
   Vec2F32 view_off;
   Vec2F32 view_off_target;
   Vec2F32 view_bounds;
@@ -426,6 +427,7 @@ struct UI_State
   D_FancyRunList string_hover_fancy_runs;
   U64 string_hover_begin_us;
   U64 string_hover_build_index;
+  U64 last_time_mousemoved_us;
   
   //- rjf: tooltip state
   F32 tooltip_open_t;

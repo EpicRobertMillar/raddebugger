@@ -646,12 +646,21 @@ ui_begin_build(OS_EventList *events, OS_Handle window, UI_NavActionList *nav_act
     ui_state->ctx_menu_changed = 0;
   }
   
+  //- rjf: detect mouse-moves
+  for(OS_Event *e = events->first; e != 0; e = e->next)
+  {
+    if(e->kind == OS_EventKind_MouseMove && os_handle_match(e->window, window))
+    {
+      ui_state->last_time_mousemoved_us = os_now_microseconds();
+    }
+  }
+  
   //- rjf: fill build phase parameters
   {
     ui_state->events = events;
     ui_state->window = window;
     ui_state->nav_actions = nav_actions;
-    ui_state->mouse = os_window_is_focused(window) ? os_mouse_from_window(window) : v2f32(-100, -100);
+    ui_state->mouse = (os_window_is_focused(window) || ui_state->last_time_mousemoved_us+500000 >= os_now_microseconds()) ? os_mouse_from_window(window) : v2f32(-100, -100);
     ui_state->animation_dt = animation_dt;
     MemoryZeroStruct(&ui_state->icon_info);
     ui_state->icon_info.icon_font = icon_info->icon_font;
@@ -922,8 +931,7 @@ ui_begin_build(OS_EventList *events, OS_Handle window, UI_NavActionList *nav_act
   }
   
   //- rjf: setup parent box for tooltip
-  Vec2F32 mouse = ui_state->mouse;
-  UI_FixedX(mouse.x+15.f) UI_FixedY(mouse.y) UI_PrefWidth(ui_children_sum(1.f)) UI_PrefHeight(ui_children_sum(1.f))
+  UI_FixedX(ui_state->mouse.x+15.f) UI_FixedY(ui_state->mouse.y) UI_PrefWidth(ui_children_sum(1.f)) UI_PrefHeight(ui_children_sum(1.f))
   {
     ui_set_next_child_layout_axis(Axis2_Y);
     ui_state->tooltip_root = ui_build_box_from_stringf(0, "###tooltip_%I64x", window.u64[0]);
@@ -1151,6 +1159,7 @@ ui_end_build(void)
                                                                          box->first_touched_build_index == box->first_disabled_build_index);
         B32 is_focus_hot      = !!(box->flags & UI_BoxFlag_FocusHot) && !(box->flags & UI_BoxFlag_FocusHotDisabled);
         B32 is_focus_active   = !!(box->flags & UI_BoxFlag_FocusActive) && !(box->flags & UI_BoxFlag_FocusActiveDisabled);
+        B32 is_focus_active_disabled = !!(box->flags & UI_BoxFlag_FocusActiveDisabled);
         
         // rjf: determine rates
         F32 hot_rate      = fast_rate;
@@ -1165,15 +1174,16 @@ ui_end_build(void)
         box_is_animating = (box_is_animating || abs_f32((F32)is_disabled     - box->disabled_t) > 0.01f);
         box_is_animating = (box_is_animating || abs_f32((F32)is_focus_hot    - box->focus_hot_t) > 0.01f);
         box_is_animating = (box_is_animating || abs_f32((F32)is_focus_active - box->focus_active_t) > 0.01f);
+        box_is_animating = (box_is_animating || abs_f32((F32)is_focus_active_disabled - box->focus_active_disabled_t) > 0.01f);
         box_is_animating = (box_is_animating || abs_f32(box->view_off_target.x - box->view_off.x) > 0.5f);
         box_is_animating = (box_is_animating || abs_f32(box->view_off_target.y - box->view_off.y) > 0.5f);
         if(box->flags & UI_BoxFlag_AnimatePosX)
         {
-          box_is_animating = (box_is_animating || fabsf(box->fixed_position_animated.x - box->fixed_position.x) > 0.5f);
+          box_is_animating = (box_is_animating || abs_f32(box->fixed_position_animated.x - box->fixed_position.x) > 0.5f);
         }
         if(box->flags & UI_BoxFlag_AnimatePosY)
         {
-          box_is_animating = (box_is_animating || fabsf(box->fixed_position_animated.y - box->fixed_position.y) > 0.5f);
+          box_is_animating = (box_is_animating || abs_f32(box->fixed_position_animated.y - box->fixed_position.y) > 0.5f);
         }
         ui_state->is_animating = (ui_state->is_animating || box_is_animating);
 #if 0 // NOTE(rjf): enable to debug animation-causing-frames (or not)
@@ -1185,21 +1195,22 @@ ui_end_build(void)
 #endif
         
         // rjf: animate interaction transition states
-        box->hot_t          += hot_rate      * ((F32)is_hot - box->hot_t);
-        box->active_t       += active_rate   * ((F32)is_active - box->active_t);
-        box->disabled_t     += disabled_rate * ((F32)is_disabled - box->disabled_t);
-        box->focus_hot_t    += focus_rate    * ((F32)is_focus_hot - box->focus_hot_t);
-        box->focus_active_t += focus_rate    * ((F32)is_focus_active - box->focus_active_t);
+        box->hot_t                   += hot_rate      * ((F32)is_hot - box->hot_t);
+        box->active_t                += active_rate   * ((F32)is_active - box->active_t);
+        box->disabled_t              += disabled_rate * ((F32)is_disabled - box->disabled_t);
+        box->focus_hot_t             += focus_rate    * ((F32)is_focus_hot - box->focus_hot_t);
+        box->focus_active_t          += focus_rate    * ((F32)is_focus_active - box->focus_active_t);
+        box->focus_active_disabled_t += focus_rate    * ((F32)is_focus_active_disabled - box->focus_active_disabled_t);
         
         // rjf: animate positions
         {
           box->fixed_position_animated.x += fast_rate * (box->fixed_position.x - box->fixed_position_animated.x);
           box->fixed_position_animated.y += fast_rate * (box->fixed_position.y - box->fixed_position_animated.y);
-          if(fabsf(box->fixed_position.x - box->fixed_position_animated.x) < 1)
+          if(abs_f32(box->fixed_position.x - box->fixed_position_animated.x) < 1)
           {
             box->fixed_position_animated.x = box->fixed_position.x;
           }
-          if(fabsf(box->fixed_position.y - box->fixed_position_animated.y) < 1)
+          if(abs_f32(box->fixed_position.y - box->fixed_position_animated.y) < 1)
           {
             box->fixed_position_animated.y = box->fixed_position.y;
           }
@@ -1221,11 +1232,11 @@ ui_end_build(void)
         {
           box->view_off.x += fast_rate * (box->view_off_target.x - box->view_off.x);
           box->view_off.y += fast_rate * (box->view_off_target.y - box->view_off.y);
-          if(fabsf(box->view_off.x - box->view_off_target.x) < 2)
+          if(abs_f32(box->view_off.x - box->view_off_target.x) < 2)
           {
             box->view_off.x = box->view_off_target.x;
           }
-          if(fabsf(box->view_off.y - box->view_off_target.y) < 2)
+          if(abs_f32(box->view_off.y - box->view_off_target.y) < 2)
           {
             box->view_off.y = box->view_off_target.y;
           }
@@ -1302,6 +1313,8 @@ ui_end_build(void)
   }
   
   //- rjf: hovering possibly-truncated drawn text -> store text
+  if(ui_key_match(ui_key_zero(), ui_state->active_box_key[Side_Min]) &&
+     ui_key_match(ui_key_zero(), ui_state->active_box_key[Side_Max]))
   {
     B32 found = 0;
     for(UI_Box *box = ui_state->root, *next = 0; !ui_box_is_nil(box); box = next)
@@ -1316,12 +1329,13 @@ ui_end_build(void)
           String8 box_display_string = ui_box_display_string(b);
           Vec2F32 text_pos = ui_box_text_position(b);
           Vec2F32 drawn_text_dim = b->display_string_runs.dim;
-          if(drawn_text_dim.x > dim_2f32(b->rect).x &&
-             contains_2f32(r2f32p(text_pos.x,
-                                  b->rect.y0,
-                                  Min(text_pos.x+drawn_text_dim.x, b->rect.x1),
-                                  b->rect.y1),
-                           ui_state->mouse))
+          B32 text_is_truncated = (drawn_text_dim.x + text_pos.x > b->rect.x1);
+          B32 mouse_is_hovering = contains_2f32(r2f32p(text_pos.x,
+                                                       b->rect.y0,
+                                                       Min(text_pos.x+drawn_text_dim.x, b->rect.x1),
+                                                       b->rect.y1),
+                                                ui_state->mouse);
+          if(text_is_truncated && mouse_is_hovering)
           {
             if(!str8_match(box_display_string, ui_state->string_hover_string, 0))
             {
@@ -1335,7 +1349,7 @@ ui_end_build(void)
             goto break_all_hover_string;
           }
         }
-        if(b != box && contains_2f32(b->rect, ui_state->mouse))
+        if(b != box && contains_2f32(b->rect, ui_state->mouse) && b->flags & UI_BoxFlag_DrawText)
         {
           goto break_all_hover_string;
         }
@@ -2243,7 +2257,7 @@ ui_box_text_position(UI_Box *box)
   F_Tag font = box->font;
   F32 font_size = box->font_size;
   F_Metrics font_metrics = f_metrics_from_tag_size(font, font_size);
-  result.y = ceilf((box->rect.p0.y + box->rect.p1.y)/2.f + (font_metrics.capital_height/2));
+  result.y = ceil_f32((box->rect.p0.y + box->rect.p1.y)/2.f + (font_metrics.capital_height/2) - font_metrics.line_gap/2);
   switch(box->text_align)
   {
     default:
